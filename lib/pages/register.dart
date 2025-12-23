@@ -3,18 +3,18 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../services/auth_service.dart';
 import 'homepage.dart';
-import 'register.dart';
 
-class LoginPage extends StatefulWidget {
+class RegisterPage extends StatefulWidget {
   final AuthService? authService;
   
-  const LoginPage({Key? key, this.authService}) : super(key: key);
+  const RegisterPage({Key? key, this.authService}) : super(key: key);
 
   @override
-  State<LoginPage> createState() => _LoginPageState();
+  State<RegisterPage> createState() => _RegisterPageState();
 }
 
-class _LoginPageState extends State<LoginPage> {
+class _RegisterPageState extends State<RegisterPage> {
+  final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
@@ -28,13 +28,43 @@ class _LoginPageState extends State<LoginPage> {
     _authService = widget.authService ?? AuthService();
   }
 
-  Future<void> _login() async {
+  Future<void> _register() async {
+    // Validasi input
+    if (_nameController.text.isEmpty) {
+      setState(() {
+        _result = 'Nama tidak boleh kosong';
+      });
+      return;
+    }
+
+    if (_emailController.text.isEmpty) {
+      setState(() {
+        _result = 'Email tidak boleh kosong';
+      });
+      return;
+    }
+
+    if (_passwordController.text.isEmpty) {
+      setState(() {
+        _result = 'Password tidak boleh kosong';
+      });
+      return;
+    }
+
+    if (_passwordController.text.length < 6) {
+      setState(() {
+        _result = 'Password minimal 6 karakter';
+      });
+      return;
+    }
+
     setState(() {
       _loading = true;
       _result = null;
     });
 
-    final data = await _authService.login(
+    final data = await _authService.register(
+      _nameController.text,
       _emailController.text,
       _passwordController.text,
     );
@@ -53,11 +83,26 @@ class _LoginPageState extends State<LoginPage> {
       await _secureStorage.write(key: 'auth_token', value: token);
 
       setState(() {
-        _result = 'Login berhasil! Selamat datang, ${user['name']}';
+        _result = 'Registrasi berhasil! Selamat datang, ${user['name']}';
       });
     } else {
+      // Handle error messages
+      String errorMessage = data['message'] ?? 'Registrasi gagal';
+      
+      // Check for validation errors
+      if (data['errors'] != null) {
+        final errors = data['errors'] as Map<String, dynamic>;
+        if (errors.isNotEmpty) {
+          // Get the first error message
+          final firstError = errors.values.first;
+          if (firstError is List && firstError.isNotEmpty) {
+            errorMessage = firstError[0];
+          }
+        }
+      }
+
       setState(() {
-        _result = data['message'] ?? 'Login gagal';
+        _result = errorMessage;
       });
     }
 
@@ -110,7 +155,7 @@ class _LoginPageState extends State<LoginPage> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Text(
-                          'Login',
+                          'Register',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 24,
@@ -119,6 +164,19 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                         ),
                         const SizedBox(height: 30),
+                        TextField(
+                          controller: _nameController,
+                          decoration: InputDecoration(
+                            labelText: 'Nama',
+                            prefixIcon: const Icon(Icons.person_outline),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            filled: true,
+                            fillColor: Colors.grey[50],
+                          ),
+                        ),
+                        const SizedBox(height: 20),
                         TextField(
                           controller: _emailController,
                           decoration: InputDecoration(
@@ -130,6 +188,7 @@ class _LoginPageState extends State<LoginPage> {
                             filled: true,
                             fillColor: Colors.grey[50],
                           ),
+                          keyboardType: TextInputType.emailAddress,
                         ),
                         const SizedBox(height: 20),
                         TextField(
@@ -150,9 +209,9 @@ class _LoginPageState extends State<LoginPage> {
                             ? const Center(child: CircularProgressIndicator())
                             : ElevatedButton(
                                 onPressed: () async {
-                                  await _login();
+                                  await _register();
                                   if (_result != null &&
-                                      _result!.startsWith('Login berhasil')) {
+                                      _result!.startsWith('Registrasi berhasil')) {
                                     Navigator.pushReplacement(
                                       context,
                                       MaterialPageRoute(
@@ -169,7 +228,7 @@ class _LoginPageState extends State<LoginPage> {
                                   elevation: 2,
                                 ),
                                 child: const Text(
-                                  'LOGIN',
+                                  'REGISTER',
                                   style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
@@ -210,7 +269,7 @@ class _LoginPageState extends State<LoginPage> {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Text(
-                              'Belum punya akun? ',
+                              'Sudah punya akun? ',
                               style: TextStyle(
                                 color: Colors.grey[600],
                                 fontSize: 14,
@@ -218,14 +277,10 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                             GestureDetector(
                               onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                      builder: (context) => const RegisterPage()),
-                                );
+                                Navigator.pop(context);
                               },
                               child: const Text(
-                                'Daftar',
+                                'Login',
                                 style: TextStyle(
                                   color: Color(0xFF2575FC),
                                   fontSize: 14,
